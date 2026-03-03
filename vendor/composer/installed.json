@@ -1,0 +1,54 @@
+{
+    "packages": [
+        {
+            "name": "antom/global-open-sdk-php",
+            "version": "v1.4.27",
+            "version_normalized": "1.4.27.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/alipay/global-open-sdk-php.git",
+                "reference": "1e727b52caca65f7d15ab90c9506f811ab2944ce"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/alipay/global-open-sdk-php/zipball/1e727b52caca65f7d15ab90c9506f811ab2944ce",
+                "reference": "1e727b52caca65f7d15ab90c9506f811ab2944ce",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "ext-openssl": "*"
+            },
+            "time": "2026-02-06T07:36:58+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "Model\\": "model/",
+                    "Client\\": "client/",
+                    "Request\\": "request/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Alipay",
+                    "email": "wangzunjiao.wzj@alibaba-inc.com"
+                }
+            ],
+            "description": "global-open-sdk-php",
+            "homepage": "https://dashboard.alipay.com/global-payments/",
+            "support": {
+                "issues": "https://github.com/alipay/global-open-sdk-php/issues",
+                "source": "https://github.com/alipay/global-open-sdk-php/tree/v1.4.27"
+            },
+            "install-path": "../antom/global-open-sdk-php"
+        }
+    ],
+    "dev": true,
+    "dev-package-names": []
+}

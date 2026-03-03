@@ -1,0 +1,5 @@
+{
+    "require": {
+        "antom/global-open-sdk-php": "^1.4"
+    }
+}
