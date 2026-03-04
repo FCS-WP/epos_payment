@@ -58,8 +58,15 @@ class Antom_Service
     $amount_value = (string) intval(round($order->get_total() * 100));
 
     $body = [
+      'env'              => [
+        'clientIp' =>  $_SERVER['REMOTE_ADDR'] ?? '',
+        'terminalType' => 'WEB',
+
+      ],
+      'settlementStrategy' => ["settlementCurrency" => $currency],
       'paymentRequestId'   => $request_id,
       'productCode'        => 'CASHIER_PAYMENT',
+      'productScene'        => 'CHECKOUT_PAYMENT',
       'paymentAmount'      => [
         'currency' => $currency,
         'value'    => $amount_value,
@@ -74,12 +81,16 @@ class Antom_Service
         'buyer'            => [
           'referenceBuyerId' => (string) ($order->get_customer_id() ?: $order->get_billing_email()),
         ],
-        'env'              => [
-          'terminalType' => 'WEB',
-        ],
       ],
       'paymentRedirectUrl' => $return_url,
       'paymentNotifyUrl'   => $notify_url,
+      'availablePaymentMethod' => [
+        "paymentMethodTypeList" => [
+          ["paymentMethodType" => "PAYNOW"],
+          ["paymentMethodType" => "CARD"],
+          // ["paymentMethodType" => "TNG"],
+        ],
+      ],
     ];
 
     $path = $this->get_api_path('/payments/createPaymentSession');
