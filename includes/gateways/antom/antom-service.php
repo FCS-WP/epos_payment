@@ -81,15 +81,13 @@ class Antom_Service
         'buyer'            => [
           'referenceBuyerId' => (string) ($order->get_customer_id() ?: $order->get_billing_email()),
         ],
+        'goods'            => $this->build_goods($order, $currency),
+        'shipping'         => $this->build_shipping($order),
       ],
       'paymentRedirectUrl' => $return_url,
       'paymentNotifyUrl'   => $notify_url,
       'availablePaymentMethod' => [
-        "paymentMethodTypeList" => [
-          ["paymentMethodType" => "PAYNOW"],
-          ["paymentMethodType" => "CARD"],
-          // ["paymentMethodType" => "TNG"],
-        ],
+        'paymentMethodTypeList' => $this->get_payment_methods_by_currency($currency),
       ],
     ];
 
@@ -190,6 +188,102 @@ class Antom_Service
     }
 
     return $base . $endpoint;
+  }
+
+  /**
+   * Build goods array from WooCommerce order items.
+   *
+   * @param \WC_Order $order
+   * @param string    $currency
+   * @return array
+   */
+  private function build_goods($order, $currency)
+  {
+    $goods = [];
+
+    foreach ($order->get_items() as $item) {
+      $product = $item->get_product();
+
+      $good = [
+        'referenceGoodsId' => (string) ($product ? $product->get_sku() ?: $product->get_id() : $item->get_product_id()),
+        'goodsName'        => $item->get_name(),
+        'goodsQuantity'    => (string) $item->get_quantity(),
+        'goodsUnitAmount'  => [
+          'currency' => $currency,
+          'value'    => (string) intval(round(($item->get_total() / $item->get_quantity()) * 100)),
+        ],
+      ];
+
+      if ($product) {
+        $image_id  = $product->get_image_id();
+        $image_url = $image_id ? wp_get_attachment_url($image_id) : '';
+
+        if (!empty($image_url)) {
+          $good['goodsUrl'] = $image_url;
+        }
+
+        if ($product->get_short_description()) {
+          $good['goodsCategory'] = wp_strip_all_tags(substr($product->get_short_description(), 0, 256));
+        }
+      }
+
+      $goods[] = $good;
+    }
+
+    return $goods;
+  }
+
+  /**
+   * Build shipping info from WooCommerce order.
+   *
+   * @param \WC_Order $order
+   * @return array
+   */
+  private function build_shipping($order)
+  {
+    $shipping = [
+      'shippingName'    => [
+        'firstName' => $order->get_shipping_first_name() ?: $order->get_billing_first_name(),
+        'lastName'  => $order->get_shipping_last_name() ?: $order->get_billing_last_name(),
+      ],
+      'shippingAddress' => [
+        'address1' => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
+        'address2' => $order->get_shipping_address_2() ?: $order->get_billing_address_2(),
+        'city'     => $order->get_shipping_city() ?: $order->get_billing_city(),
+        'state'    => $order->get_shipping_state() ?: $order->get_billing_state(),
+        'zipCode'  => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
+        'region'   => $order->get_shipping_country() ?: $order->get_billing_country(),
+      ],
+    ];
+
+    $phone = $order->get_billing_phone();
+    if (!empty($phone)) {
+      $shipping['shippingPhoneNo'] = $phone;
+    }
+
+    return $shipping;
+  }
+
+  /**
+   * Get available payment methods based on currency.
+   *
+   * @param string $currency
+   * @return array
+   */
+  private function get_payment_methods_by_currency($currency)
+  {
+    $methods = [
+      'SGD' => [
+        ['paymentMethodType' => 'CARD'],
+        ['paymentMethodType' => 'PAYNOW'],
+      ],
+      'MYR' => [
+        ['paymentMethodType' => 'CARD'],
+        ['paymentMethodType' => 'TNG'],
+      ],
+    ];
+
+    return $methods[$currency] ?? [['paymentMethodType' => 'CARD']];
   }
 
   /**
