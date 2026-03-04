@@ -100,6 +100,23 @@ class Antom_Service
   }
 
   /**
+   * Inquiry payment status from Antom.
+   *
+   * @param string $payment_request_id
+   * @return array|\WP_Error
+   */
+  public function inquiry_payment($payment_request_id)
+  {
+    $body = [
+      'paymentRequestId' => $payment_request_id,
+    ];
+
+    $path = $this->get_api_path('/payments/inquiryPayment');
+
+    return $this->request($path, $body);
+  }
+
+  /**
    * Send a signed request to the Antom API.
    *
    * @param string $path

@@ -4,6 +4,8 @@ namespace EPOS_PAYMENT\Includes\Gateways\Antom;
 
 defined('ABSPATH') || exit;
 
+use EPOS_PAYMENT\Includes\Logs\Zippy_Pay_Logger;
+
 class Antom_Gateway extends \WC_Payment_Gateway
 {
 
@@ -28,6 +30,9 @@ class Antom_Gateway extends \WC_Payment_Gateway
 
     // Register webhook handler.
     add_action('woocommerce_api_antom_payment', [$this, 'handle_webhook']);
+
+    // Register inquiry payment background handler.
+    add_action(ANTOM_INQUIRY_HOOK, [$this, 'handle_inquiry_payment']);
   }
 
   /**
@@ -112,9 +117,12 @@ class Antom_Gateway extends \WC_Payment_Gateway
       $order->save();
     }
 
+    // Schedule background inquiry as webhook fallback (5 minutes delay).
+    as_schedule_single_action(time() + 300, ANTOM_INQUIRY_HOOK, ['order_id' => $order_id]);
+
     return [
       'result'   => 'success',
-      'redirect' => $result['normalUrl'] ?? $this->get_return_url($order),
+      'redirect' => $result['normalUrl'] ?? $order->get_checkout_payment_url(),
     ];
   }
 
@@ -129,5 +137,108 @@ class Antom_Gateway extends \WC_Payment_Gateway
     );
 
     $webhook->handle();
+  }
+
+  /**
+   * Background inquiry payment status (webhook fallback).
+   *
+   * @param int $order_id
+   */
+  public function handle_inquiry_payment($order_id)
+  {
+    $order = wc_get_order($order_id);
+
+    if (!$order) {
+      Zippy_Pay_Logger::error('Antom inquiry: order not found.', ['order_id' => $order_id]);
+      return;
+    }
+
+    if ($order->is_paid()) {
+      Zippy_Pay_Logger::info('Antom inquiry: order already paid, skipping.', ['order_id' => $order_id]);
+      return;
+    }
+
+    $payment_request_id = $order->get_meta(ANTOM_META_PAYMENT_REQUEST_ID);
+
+    if (empty($payment_request_id)) {
+      Zippy_Pay_Logger::error('Antom inquiry: missing payment request ID.', ['order_id' => $order_id]);
+      return;
+    }
+
+    $service = new Antom_Service(
+      ANTOM_GATEWAY_URL,
+      $this->get_option('client_id'),
+      $this->get_option('private_key'),
+      $this->get_option('alipay_public_key')
+    );
+
+    $response = $service->inquiry_payment($payment_request_id);
+
+    if (is_wp_error($response)) {
+      Zippy_Pay_Logger::error('Antom inquiry: API error.', [
+        'order_id' => $order_id,
+        'message'  => $response->get_error_message(),
+      ]);
+      return;
+    }
+
+    $payment_status      = $response['paymentStatus'] ?? '';
+    $payment_id          = $response['paymentId'] ?? '';
+    $payment_method_type = $response['paymentMethodType'] ?? '';
+    $result_code         = $response['result']['resultCode'] ?? '';
+
+    Zippy_Pay_Logger::info('Antom inquiry: response received.', [
+      'order_id'       => $order_id,
+      'paymentStatus'  => $payment_status,
+      'paymentId'      => $payment_id,
+      'resultCode'     => $result_code,
+    ]);
+
+    if ($result_code !== 'SUCCESS') {
+      Zippy_Pay_Logger::error('Antom inquiry: API returned non-success result.', [
+        'order_id'   => $order_id,
+        'resultCode' => $result_code,
+      ]);
+      return;
+    }
+
+    switch ($payment_status) {
+      case 'SUCCESS':
+        if (!empty($payment_method_type)) {
+          $order->set_payment_method_title('Antom - ' . $payment_method_type);
+        }
+        $order->payment_complete($payment_id);
+        $order->add_order_note(
+          sprintf(__('Antom payment confirmed via inquiry. Payment ID: %s', 'epos-payment'), $payment_id)
+        );
+        break;
+
+      case 'FAIL':
+        $order->update_status('failed', __('Antom payment failed (confirmed via inquiry).', 'epos-payment'));
+        break;
+
+      case 'CANCELLED':
+        $order->update_status('cancelled', __('Antom payment cancelled (confirmed via inquiry).', 'epos-payment'));
+        break;
+
+      case 'PROCESSING':
+        $retry_count = (int) $order->get_meta('_antom_inquiry_retry_count');
+        if ($retry_count < 1) {
+          $order->update_meta_data('_antom_inquiry_retry_count', $retry_count + 1);
+          $order->save();
+          as_schedule_single_action(time() + 300, ANTOM_INQUIRY_HOOK, ['order_id' => $order_id]);
+          Zippy_Pay_Logger::info('Antom inquiry: still processing, scheduled retry.', ['order_id' => $order_id]);
+        } else {
+          Zippy_Pay_Logger::info('Antom inquiry: still processing after max retries.', ['order_id' => $order_id]);
+        }
+        break;
+
+      default:
+        Zippy_Pay_Logger::error('Antom inquiry: unknown payment status.', [
+          'order_id'      => $order_id,
+          'paymentStatus' => $payment_status,
+        ]);
+        break;
+    }
   }
 }

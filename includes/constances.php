@@ -17,3 +17,9 @@ if (!defined('ANTOM_GATEWAY_URL')) {
 if (!defined('ANTOM_META_PAYMENT_REQUEST_ID')) {
   define('ANTOM_META_PAYMENT_REQUEST_ID', '_antom_payment_request_id');
 }
+
+/* Antom Action Scheduler Hooks */
+
+if (!defined('ANTOM_INQUIRY_HOOK')) {
+  define('ANTOM_INQUIRY_HOOK', 'antom_inquiry_payment');
+}
