@@ -11,3 +11,9 @@ if (!defined('EPOS_CRM_URL')) {
 if (!defined('ANTOM_GATEWAY_URL')) {
   define('ANTOM_GATEWAY_URL', 'https://open-sea-global.alipay.com');
 }
+
+/* Antom Order Meta Keys */
+
+if (!defined('ANTOM_META_PAYMENT_REQUEST_ID')) {
+  define('ANTOM_META_PAYMENT_REQUEST_ID', '_antom_payment_request_id');
+}

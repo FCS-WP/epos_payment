@@ -91,6 +91,9 @@ class Antom_Service
       ],
     ];
 
+    $order->update_meta_data(ANTOM_META_PAYMENT_REQUEST_ID, $request_id);
+    $order->save();
+
     $path = $this->get_api_path('/payments/createPaymentSession');
 
     return $this->request($path, $body);
@@ -199,10 +202,13 @@ class Antom_Service
    */
   private function build_goods($order, $currency)
   {
-    $goods = [];
+    $goods      = [];
+    $goods_total = 0;
 
     foreach ($order->get_items() as $item) {
-      $product = $item->get_product();
+      $product    = $item->get_product();
+      $unit_value = intval(round(($item->get_total() / $item->get_quantity()) * 100));
+      $goods_total += $unit_value * $item->get_quantity();
 
       $good = [
         'referenceGoodsId' => (string) ($product ? $product->get_sku() ?: $product->get_id() : $item->get_product_id()),
@@ -210,7 +216,7 @@ class Antom_Service
         'goodsQuantity'    => (string) $item->get_quantity(),
         'goodsUnitAmount'  => [
           'currency' => $currency,
-          'value'    => (string) intval(round(($item->get_total() / $item->get_quantity()) * 100)),
+          'value'    => (string) $unit_value,
         ],
       ];
 
@@ -228,6 +234,75 @@ class Antom_Service
       }
 
       $goods[] = $good;
+    }
+
+    // Shipping fee
+    $shipping_total = intval(round($order->get_shipping_total() * 100));
+    if ($shipping_total > 0) {
+      $goods_total += $shipping_total;
+      $goods[] = [
+        'referenceGoodsId' => 'shipping-fee',
+        'goodsName'        => 'Shipping Fee',
+        'goodsQuantity'    => '1',
+        'goodsUnitAmount'  => [
+          'currency' => $currency,
+          'value'    => (string) $shipping_total,
+        ],
+      ];
+    }
+
+    // Tax with label
+    $tax_total = intval(round($order->get_total_tax() * 100));
+    if ($tax_total > 0) {
+      $tax_label = 'Tax';
+      $tax_items = $order->get_items('tax');
+      if (!empty($tax_items)) {
+        $first_tax = reset($tax_items);
+        $tax_label = $first_tax->get_label() ?: 'Tax';
+      }
+
+      $goods_total += $tax_total;
+      $goods[] = [
+        'referenceGoodsId' => 'tax',
+        'goodsName'        => $tax_label,
+        'goodsQuantity'    => '1',
+        'goodsUnitAmount'  => [
+          'currency' => $currency,
+          'value'    => (string) $tax_total,
+        ],
+      ];
+    }
+
+    // Other fees (coupons, surcharges, etc.)
+    foreach ($order->get_items('fee') as $fee_item) {
+      $fee_value = intval(round($fee_item->get_total() * 100));
+      if ($fee_value > 0) {
+        $goods_total += $fee_value;
+        $goods[] = [
+          'referenceGoodsId' => 'fee-' . $fee_item->get_id(),
+          'goodsName'        => $fee_item->get_name() ?: 'Fee',
+          'goodsUnitAmount'  => [
+            'currency' => $currency,
+            'value'    => (string) $fee_value,
+          ],
+        ];
+      }
+    }
+
+    // Catch any remaining difference (rounding, discounts adjustments)
+    $order_total   = intval(round($order->get_total() * 100));
+    $remaining     = $order_total - $goods_total;
+
+    if ($remaining > 0) {
+      $goods[] = [
+        'referenceGoodsId' => 'adjustment',
+        'goodsName'        => 'Adjustment',
+        'goodsQuantity'    => '1',
+        'goodsUnitAmount'  => [
+          'currency' => $currency,
+          'value'    => (string) $remaining,
+        ],
+      ];
     }
 
     return $goods;

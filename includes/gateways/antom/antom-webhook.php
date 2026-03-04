@@ -92,9 +92,20 @@ class Antom_Webhook
       return;
     }
 
-    $payment_request_id = $data['paymentRequestId'] ?? '';
-    $result_code        = $data['result']['resultCode'] ?? '';
-    $payment_id         = $data['paymentId'] ?? '';
+    $notify_type = $data['notifyType'] ?? '';
+
+    if ($notify_type !== 'PAYMENT_RESULT') {
+      Zippy_Pay_Logger::info('Antom webhook: ignoring notification type.', [
+        'notifyType' => $notify_type,
+      ]);
+      $this->send_response('SUCCESS', 'success');
+      return;
+    }
+
+    $payment_request_id  = $data['paymentRequestId'] ?? '';
+    $result_code         = $data['result']['resultCode'] ?? '';
+    $payment_id          = $data['paymentId'] ?? '';
+    $payment_method_type = $data['paymentMethodType'] ?? '';
 
     if (empty($payment_request_id)) {
       Zippy_Pay_Logger::error('Antom webhook: missing paymentRequestId.');
@@ -119,7 +130,7 @@ class Antom_Webhook
       'paymentRequestId' => $payment_request_id,
     ]);
 
-    $this->update_order($order, $result_code, $payment_id);
+    $this->update_order($order, $result_code, $payment_id, $payment_method_type);
 
     $this->send_response('SUCCESS', 'success');
   }
@@ -156,18 +167,13 @@ class Antom_Webhook
 
   /**
    * Get the notification path for signature verification.
+   * Antom signs notifications using the merchant's notify URL path.
    *
    * @return string
    */
   private function get_notify_path()
   {
-    $base = '/ams/api/v1';
-
-    if (strpos($this->client_id, 'SANDBOX_') === 0) {
-      $base = '/ams/sandbox/api/v1';
-    }
-
-    return $base . '/payments/notifyPayment';
+    return parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
   }
 
   /**
@@ -180,7 +186,7 @@ class Antom_Webhook
   private function find_order_by_payment_request_id($payment_request_id)
   {
     $orders = wc_get_orders([
-      'meta_key'   => '_antom_payment_request_id',
+      'meta_key'   => ANTOM_META_PAYMENT_REQUEST_ID,
       'meta_value' => $payment_request_id,
       'limit'      => 1,
     ]);
@@ -195,7 +201,7 @@ class Antom_Webhook
    * @param string    $result_code
    * @param string    $payment_id
    */
-  private function update_order($order, $result_code, $payment_id)
+  private function update_order($order, $result_code, $payment_id, $payment_method_type = '')
   {
     if ($order->is_paid()) {
       Zippy_Pay_Logger::info('Antom webhook: order already paid, skipping.', [
@@ -204,11 +210,16 @@ class Antom_Webhook
       return;
     }
 
+    if (!empty($payment_method_type)) {
+      $order->set_payment_method_title('Antom - ' . $payment_method_type);
+      $order->save();
+    }
+
     switch ($result_code) {
       case 'SUCCESS':
         $order->payment_complete($payment_id);
         $order->add_order_note(
-          sprintf(__('Antom payment completed. Payment ID: %s', 'epos-payment'), $payment_id)
+          sprintf(__('Antom payment completed via %s. Payment ID: %s', 'epos-payment'), $payment_method_type ?: 'unknown', $payment_id)
         );
         break;
 

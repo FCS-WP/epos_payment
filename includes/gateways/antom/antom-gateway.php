@@ -25,6 +25,9 @@ class Antom_Gateway extends \WC_Payment_Gateway
 
     // Save settings in admin.
     add_action('woocommerce_update_options_payment_gateways_' . $this->id, [$this, 'process_admin_options']);
+
+    // Register webhook handler.
+    add_action('woocommerce_api_antom_payment', [$this, 'handle_webhook']);
   }
 
   /**
@@ -113,5 +116,18 @@ class Antom_Gateway extends \WC_Payment_Gateway
       'result'   => 'success',
       'redirect' => $result['normalUrl'] ?? $this->get_return_url($order),
     ];
+  }
+
+  /**
+   * Handle Antom webhook notification.
+   */
+  public function handle_webhook()
+  {
+    $webhook = new Antom_Webhook(
+      $this->get_option('client_id'),
+      $this->get_option('alipay_public_key')
+    );
+
+    $webhook->handle();
   }
 }
