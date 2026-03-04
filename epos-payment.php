@@ -24,12 +24,10 @@ if (!defined('EPOS_PAYMENT_DIR_PATH')) {
   define('EPOS_PAYMENT_DIR_PATH', plugin_dir_path(__FILE__));
 }
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
 
-// Include composer autoloader.
-require_once EPOS_PAYMENT_DIR_PATH . 'vendor/autoload.php';
 
 // Include the autoloader.
 require_once EPOS_PAYMENT_DIR_PATH . 'includes/autoload.php';
