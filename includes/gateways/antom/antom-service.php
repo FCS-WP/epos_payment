@@ -230,6 +230,7 @@ class Antom_Service
       $good = [
         'referenceGoodsId' => (string) ($product ? $product->get_sku() ?: $product->get_id() : $item->get_product_id()),
         'goodsName'        => $item->get_name(),
+        'goodsSkuName'    => $product->get_sku() ?: '',
         'goodsQuantity'    => (string) $item->get_quantity(),
         'goodsUnitAmount'  => [
           'currency' => $currency,
@@ -242,7 +243,7 @@ class Antom_Service
         $image_url = $image_id ? wp_get_attachment_url($image_id) : '';
 
         if (!empty($image_url)) {
-          $good['goodsUrl'] = $image_url;
+          $good['goodsImageUrl'] = $image_url;
         }
 
         if ($product->get_short_description()) {

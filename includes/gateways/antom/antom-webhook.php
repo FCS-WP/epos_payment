@@ -254,6 +254,7 @@ class Antom_Webhook
     echo wp_json_encode([
       'result' => [
         'resultCode'    => $result_code,
+        'resultStatus'  => $result_code === 'SUCCESS' ? 'S' : 'F',
         'resultMessage' => $result_message,
       ],
     ]);
