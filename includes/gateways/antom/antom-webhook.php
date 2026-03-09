@@ -213,7 +213,7 @@ class Antom_Webhook
     }
 
     if (!empty($payment_method_type)) {
-      $order->set_payment_method_title('Antom - ' . $payment_method_type);
+      $order->set_payment_method_title($payment_method_type);
       $order->save();
     }
 
