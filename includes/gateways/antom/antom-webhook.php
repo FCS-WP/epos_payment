@@ -133,6 +133,8 @@ class Antom_Webhook
     $this->update_order($order, $result_code, $payment_id, $payment_method_type);
 
     $this->send_response('SUCCESS', 'success');
+
+    return;
   }
 
   /**
@@ -248,17 +250,24 @@ class Antom_Webhook
    */
   private function send_response($result_code, $result_message)
   {
-    status_header(200);
-    header('Content-Type: application/json');
-
-    echo wp_json_encode([
+    $response = [
       'result' => [
         'resultCode'    => $result_code,
         'resultStatus'  => $result_code === 'SUCCESS' ? 'S' : 'F',
         'resultMessage' => $result_message,
       ],
-    ]);
+    ];
 
+    Zippy_Pay_Logger::info('Antom webhook send back.', $response);
+
+    while (ob_get_level() > 0) {
+      ob_end_clean();
+    }
+
+
+    header('Content-Type: application/json');
+    status_header(200);
+    echo json_encode($response);
     exit;
   }
 }
